@@ -1,0 +1,19 @@
+# Arquivo: .gitignore
+# Ambientes virtuais
+**/venv/
+**/.venv/
+**/__pycache__/
+
+# Node
+**/node_modules/
+**/dist/
+
+# Pesos pesados e datasets (não versionar dados brutos)
+ai_pipeline/dataset/
+ai_pipeline/runs/
+ai_pipeline/weights/*.pt
+*.log
+
+# Variáveis de ambiente
+**/.env
+.DS_Store
