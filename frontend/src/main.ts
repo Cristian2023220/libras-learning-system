@@ -1,60 +1,128 @@
-import './style.css'
-import heroImg from './assets/hero.png'
-import typescriptLogo from './assets/typescript.svg'
-import viteLogo from './assets/vite.svg'
-import { setupCounter } from './counter.ts'
+import * as ort from "onnxruntime-web";
+import { COCO_CLASSES } from "./core/labels";
+import { FramePreprocessor } from "./core/preprocessor";
+import { Postprocessor, type Detection } from "./core/postprocessor";
 
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-<section id="center">
-  <div class="hero">
-    <img src="${heroImg}" class="base" width="170" height="179">
-    <img src="${typescriptLogo}" class="framework" alt="TypeScript logo"/>
-    <img src="${viteLogo}" class="vite" alt="Vite logo" />
-  </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/main.ts</code> and save to test <code>HMR</code></p>
-  </div>
-  <button id="counter" type="button" class="counter"></button>
-</section>
+ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/";
 
-<div class="ticks"></div>
+// Elementos da Interface
+const container = document.createElement("div");
+container.style.position = "relative";
+container.style.display = "inline-block";
+container.style.fontFamily = "sans-serif";
 
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#documentation-icon"></use></svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank">
-          <img class="logo" src="${viteLogo}" alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://www.typescriptlang.org" target="_blank">
-          <img class="button-icon" src="${typescriptLogo}" alt="">
-          Learn more
-        </a>
-      </li>
-    </ul>
-  </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#social-icon"></use></svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li><a href="https://github.com/vitejs/vite" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#github-icon"></use></svg>GitHub</a></li>
-      <li><a href="https://chat.vite.dev/" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#discord-icon"></use></svg>Discord</a></li>
-      <li><a href="https://x.com/vite_js" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#x-icon"></use></svg>X.com</a></li>
-      <li><a href="https://bsky.app/profile/vite.dev" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#bluesky-icon"></use></svg>Bluesky</a></li>
-    </ul>
-  </div>
-</section>
+const video = document.createElement("video");
+video.autoplay = true;
+video.playsInline = true;
+video.width = 640;
+video.height = 480;
 
-<div class="ticks"></div>
-<section id="spacer"></section>
-`
+const overlay = document.createElement("canvas");
+overlay.width = 640;
+overlay.height = 480;
+overlay.style.position = "absolute";
+overlay.style.left = "0";
+overlay.style.top = "0";
+overlay.style.pointerEvents = "none";
 
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
+const overlayCtx = overlay.getContext("2d")!;
+
+const statusText = document.createElement("div");
+statusText.style.fontFamily = "monospace";
+statusText.style.fontSize = "14px";
+statusText.style.margin = "10px 0";
+statusText.innerText = "Iniciando câmera e carregando modelo...";
+
+container.appendChild(video);
+container.appendChild(overlay);
+document.body.appendChild(statusText);
+document.body.appendChild(container);
+
+// Instâncias do Pipeline
+const preprocessor = new FramePreprocessor(640);
+const postprocessor = new Postprocessor(COCO_CLASSES, 0.5, 0.45);
+let session: ort.InferenceSession | null = null;
+let isInferring = false;
+
+async function init() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480 },
+      audio: false,
+    });
+    video.srcObject = stream;
+
+    statusText.innerText = "Carregando grafo ONNX no navegador...";
+    session = await ort.InferenceSession.create("/models/yolov8n.onnx", {
+      executionProviders: ["webgl", "wasm"],
+    });
+
+    statusText.innerText = "YOLO ativo em tempo real.";
+    requestAnimationFrame(inferenceLoop);
+  } catch (err) {
+    statusText.innerText = `Erro de inicialização: ${err}`;
+  }
+}
+
+async function inferenceLoop() {
+  if (!session || video.readyState !== 4) {
+    requestAnimationFrame(inferenceLoop);
+    return;
+  }
+
+  if (!isInferring) {
+    isInferring = true;
+    const start = performance.now();
+
+    // 1. Pré-processamento
+    const inputTensor = preprocessor.process(video);
+
+    // 2. Inferência no navegador
+    const results = await session.run({ images: inputTensor });
+    const outputTensor = results[session.outputNames[0]];
+
+    // 3. Pós-processamento e NMS
+    const detections = postprocessor.process(
+      outputTensor.data as Float32Array,
+      video.width,
+      video.height,
+    );
+
+    const latency = performance.now() - start;
+    const fps = (1000 / latency).toFixed(1);
+    statusText.innerText = `Inferência Local | Latência: ${latency.toFixed(1)} ms | FPS: ~${fps} | Objetos: ${detections.length}`;
+
+    // 4. Renderização visual
+    renderDetections(detections);
+    isInferring = false;
+  }
+
+  requestAnimationFrame(inferenceLoop);
+}
+
+function renderDetections(detections: Detection[]) {
+  overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+
+  for (const det of detections) {
+    const width = det.x2 - det.x1;
+    const height = det.y2 - det.y1;
+
+    // Caixa Delimitadora
+    overlayCtx.strokeStyle = "#00FF66";
+    overlayCtx.lineWidth = 3;
+    overlayCtx.strokeRect(det.x1, det.y1, width, height);
+
+    // Rótulo de identificação
+    const label = `${det.className} (${(det.score * 100).toFixed(0)}%)`;
+    overlayCtx.font = "bold 14px sans-serif";
+    const textWidth = overlayCtx.measureText(label).width;
+
+    overlayCtx.fillStyle = "#00FF66";
+    overlayCtx.fillRect(det.x1, Math.max(0, det.y1 - 22), textWidth + 10, 22);
+
+    overlayCtx.fillStyle = "#000000";
+    overlayCtx.fillText(label, det.x1 + 5, Math.max(16, det.y1 - 6));
+  }
+}
+
+init();
