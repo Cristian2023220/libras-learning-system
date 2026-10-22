@@ -82,5 +82,28 @@ export const COCO_CLASSES = [
   "toothbrush",
 ];
 
-// Classes piloto para o modelo de LIBRAS (quando for substituído)
-export const LIBRAS_CLASSES = ["letra_a", "letra_b", "letra_c", "joinha"];
+// Classes do modelo de LIBRAS treinado via Roboflow (22 classes)
+export const LIBRAS_CLASSES = [
+  "A",
+  "B",
+  "C",
+  "D1",
+  "D2",
+  "E",
+  "F",
+  "G",
+  "I",
+  "K",
+  "L",
+  "M",
+  "N",
+  "O",
+  "P",
+  "Q",
+  "R",
+  "S",
+  "T",
+  "U",
+  "V",
+  "W",
+];

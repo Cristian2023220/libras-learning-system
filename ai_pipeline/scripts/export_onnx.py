@@ -1,20 +1,25 @@
 from ultralytics import YOLO
 import os
 
-def exportar_modelo(caminho_pesos="yolov8n.pt", destino_saida="../weights/yolov8n.onnx"):
-    print(f"Carregando pesos de: {caminho_pesos}...")
-    model = YOLO(caminho_pesos)
+def exportar_libras():
+    pesos_treinados = "../runs/libras_pilot/weights/best.pt"
+    
+    if not os.path.exists(pesos_treinados):
+        raise FileNotFoundError(f"Pesos não encontrados em {pesos_treinados}. Execute o train.py primeiro.")
 
-    print("Iniciando exportação otimizada para ONNX (Web friendly)...")
-    caminho_gerado = model.export(
+    print(f"Carregando pesos treinados de: {pesos_treinados}...")
+    model = YOLO(pesos_treinados)
+
+    print("Exportando para ONNX com otimização Web...")
+    caminho_onnx = model.export(
         format="onnx",
         imgsz=640,
-        opset=12,         # Compatibilidade total com ONNX Runtime Web
-        simplify=True,    # Remove nós redundantes do grafo
-        dynamic=False     # Buffer fixo [1, 3, 640, 640] para alta performance no cliente
+        opset=12,
+        simplify=True,
+        dynamic=False
     )
-    
-    print(f"\n[OK] Modelo exportado com sucesso: {caminho_gerado}")
+
+    print(f"\n[OK] Modelo exportado com sucesso: {caminho_onnx}")
 
 if __name__ == "__main__":
-    exportar_modelo()
+    exportar_libras()
