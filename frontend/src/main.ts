@@ -1,5 +1,5 @@
 import * as ort from "onnxruntime-web";
-import { COCO_CLASSES } from "./core/labels";
+import { LIBRAS_CLASSES } from "./core/labels";
 import { FramePreprocessor } from "./core/preprocessor";
 import { Postprocessor, type Detection } from "./core/postprocessor";
 import { TemporalStabilizer } from "./core/stabilizer";
@@ -8,7 +8,7 @@ import { AvatarFeedback } from "./components/AvatarFeedback";
 ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/";
 
 // Configuração do Exercício / Lição (Usando classes do modelo base atual para teste)
-const TARGET_GESTURE = "person"; // Pode trocar por 'cell phone' ou 'bottle' para testar com objetos
+const TARGET_GESTURE = "A";
 
 // Estrutura Principal da Página (Dark Theme)
 document.body.style.margin = "0";
@@ -118,7 +118,7 @@ document.body.appendChild(mainLayout);
 
 // Inicialização dos Motores
 const preprocessor = new FramePreprocessor(640);
-const postprocessor = new Postprocessor(COCO_CLASSES, 0.45, 0.45);
+const postprocessor = new Postprocessor(LIBRAS_CLASSES, 0.45, 0.45);
 const stabilizer = new TemporalStabilizer({
   windowSize: 8,
   thresholdRatio: 0.75,
@@ -138,7 +138,7 @@ async function init() {
     video.srcObject = stream;
 
     statusText.innerText = "Carregando grafo ONNX no navegador...";
-    session = await ort.InferenceSession.create("/models/yolov8n.onnx", {
+    session = await ort.InferenceSession.create("/models/libras_pilot.onnx", {
       executionProviders: ["webgpu", "webgl", "wasm"],
     });
 

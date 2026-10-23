@@ -2,15 +2,16 @@ from ultralytics import YOLO
 import os
 
 def exportar_libras():
-    pesos_treinados = "../runs/libras_pilot/weights/best.pt"
+    # Caminho exato gerado pelo train.py
+    pesos_treinados = os.path.abspath("../../runs/runs/libras_pilot/weights/best.pt")
     
     if not os.path.exists(pesos_treinados):
-        raise FileNotFoundError(f"Pesos não encontrados em {pesos_treinados}. Execute o train.py primeiro.")
+        raise FileNotFoundError(f"Pesos não encontrados em: {pesos_treinados}")
 
     print(f"Carregando pesos treinados de: {pesos_treinados}...")
     model = YOLO(pesos_treinados)
 
-    print("Exportando para ONNX com otimização Web...")
+    print("Iniciando exportação otimizada para ONNX (Web friendly)...")
     caminho_onnx = model.export(
         format="onnx",
         imgsz=640,
@@ -18,7 +19,7 @@ def exportar_libras():
         simplify=True,
         dynamic=False
     )
-
+    
     print(f"\n[OK] Modelo exportado com sucesso: {caminho_onnx}")
 
 if __name__ == "__main__":

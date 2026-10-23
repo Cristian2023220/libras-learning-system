@@ -82,7 +82,7 @@ export const COCO_CLASSES = [
   "toothbrush",
 ];
 
-// Classes do modelo de LIBRAS treinado via Roboflow (22 classes)
+// Classes do modelo treinado de LIBRAS (22 classes)
 export const LIBRAS_CLASSES = [
   "A",
   "B",
